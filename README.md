@@ -13,9 +13,9 @@ Schedule Trigger] --> B(🌐 HTTP Request 1
 合併雙頁資料}
   C --> D
   D --> E[💻 Code 節點
-正則表達萃取 & Set 去重複]
+正則表達過濾網址與標題]
   E --> F((💬 LINE 推播
-發送今日 30 則焦點))
+發送今日 10 則焦點))
 
   classDef green fill:#2cbb5d,stroke:#fff,stroke-width:2px,color:#fff;
   classDef blue fill:#235bf1,stroke:#fff,stroke-width:2px,color:#fff;
