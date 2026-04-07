@@ -1,0 +1,199 @@
+{
+  "name": "證券新聞爬蟲 copy",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 8,
+              "triggerAtMinute": 30
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        416,
+        224
+      ],
+      "id": "4a0e1f9a-0d92-426b-b817-d501bb7668bd",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "url": "https://money.udn.com/money/cate/5590?from=edn_navibar",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        640,
+        144
+      ],
+      "id": "dcf73239-1119-46ef-a575-31a61e3863c6",
+      "name": "HTTP Request"
+    },
+    {
+      "parameters": {
+        "jsCode": "// 準備推播的文字基底\nlet messageLines = [];\nmessageLines.push(\"📈 經濟日報 - 證券市場焦點\");\nmessageLines.push(\"=\".repeat(22));\nmessageLines.push(\"\");\n\nlet newsCount = 0;\n// 升級防禦：除了比對網址，我們連「標題」也一起比對，絕對不會再放重複的進來！\nlet seenTitles = new Set();\nlet seenUrls = new Set();\n\nconst linkRegex = /<a[^>]*href=\"(\\/money\\/story\\/[0-9]+\\/[0-9]+[^\"]*)\"[^>]*title=\"([^\"]+)\"/gi;\n\nfor (const item of $input.all()) {\n    let targetHtml = item.json.data; \n    \n    // 如果你還是用抓主網頁的，這段會發揮作用幫你把旁邊無關的新聞過濾掉\n    const sectionRegex = /<section[^>]*id=\"sub_5607\">([\\s\\S]*?)<\\/section>/i;\n    const sectionMatch = targetHtml.match(sectionRegex);\n    let parseArea = sectionMatch ? sectionMatch[1] : targetHtml;\n\n    let match;\n    while ((match = linkRegex.exec(parseArea)) !== null && newsCount < 30) {\n        \n        // 抓出原始網址跟標題\n        let fullUrl = \"https://money.udn.com\" + match[1].trim();\n        let title = match[2].trim();\n        \n        // 【關鍵修復】把網址後面的 ?from=xxx 追蹤碼直接切掉！只保留前方的乾淨篇章網址\n        let cleanUrl = fullUrl.split(\"?\")[0];\n        \n        // 雙重保險：確認我們沒看過這篇標題，且也沒看過這個乾淨網址\n        if (!seenTitles.has(title) && !seenUrls.has(cleanUrl)) {\n            seenTitles.add(title);\n            seenUrls.add(cleanUrl);\n            newsCount++;\n            \n            messageLines.push(`${newsCount}. ${title}`);\n            messageLines.push(`🔗 ${cleanUrl}`); // 推播沒有追蹤碼的網址也比較精簡好看！\n            messageLines.push(\"\");\n        }\n    }\n}\n\nif (newsCount === 0) {\n    messageLines.push(\"❗目前沒有抓到任何新聞，請確認原網站結構是否改變。\");\n} else {\n    messageLines.push(\"-\".repeat(31));\n    messageLines.push(`📊 跨頁解析完成，共為您擷取 ${newsCount} 則焦點新聞`);\n}\n\nreturn [{\n  json: {\n    type: \"text\",\n    text: messageLines.join(\"\\n\")\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1056,
+        224
+      ],
+      "id": "3556b2a5-8d64-496a-b1d9-4b78edc954bb",
+      "name": "Code"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.line.me/v2/bot/message/broadcast",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"messages\": [\n    {\n      \"type\": \"text\",\n      \"text\": {{ JSON.stringify($json.text) }}\n    }\n  ]\n}\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1232,
+        224
+      ],
+      "id": "cbccb128-7dfa-419d-af69-208e823d51e8",
+      "name": "發送回應給 LINE",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "LgLVOQMFgnCSZazI",
+          "name": "Header Auth account 2"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        864,
+        224
+      ],
+      "id": "f4ca6f5d-9e51-4871-abb8-64f2d7f941e4",
+      "name": "Merge"
+    },
+    {
+      "parameters": {
+        "url": "https://money.udn.com/money/get_article/2/1001/5590/5607",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Requested-With",
+              "value": "XMLHttpRequest"
+            },
+            {
+              "name": "Referer",
+              "value": "https://money.udn.com/"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        640,
+        304
+      ],
+      "id": "d3bfed04-e862-43f4-b9df-77fc540cbdca",
+      "name": "HTTP Request1"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "HTTP Request1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code": {
+      "main": [
+        [
+          {
+            "node": "發送回應給 LINE",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Code",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request1": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "5ac26b02-343f-4539-9214-bd8437677a39",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "f1692050b4724ed8d81ad65c0ebc3295ac4faf79b715e7df765ab6e54bc0b155"
+  },
+  "id": "C6FfGCnvxACqcFgn",
+  "tags": [
+    {
+      "updatedAt": "2026-03-12T06:09:44.342Z",
+      "createdAt": "2026-03-12T06:09:44.342Z",
+      "id": "ckhyO96t1ZedSIif",
+      "name": "n8n"
+    }
+  ]
+}
